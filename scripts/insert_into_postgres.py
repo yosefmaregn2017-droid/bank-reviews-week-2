@@ -2,11 +2,8 @@ import pandas as pd
 import psycopg2
 from pathlib import Path
 
-# Get project root directory
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Load the cleaned + sentiment + theme data
-data_path = BASE_DIR / "data" / "reviews_with_themes.csv"
+# Load data
+data_path = Path(__file__).resolve().parent.parent / "data" / "processed" / "bank_reviews_analysis.csv"
 df = pd.read_csv(data_path)
 
 print(f"Loaded {len(df)} reviews")
@@ -15,8 +12,8 @@ print(f"Loaded {len(df)} reviews")
 conn = psycopg2.connect(
     host="localhost",
     database="bank_reviews",
-    user="postgres",        # change if needed
-    password="Kifiya@123",  # your password
+    user="postgres",
+    password="Kifiya@123",
     port=5432
 )
 
@@ -24,9 +21,9 @@ cursor = conn.cursor()
 
 # Insert query
 insert_query = """
-    INSERT INTO reviews 
-    (bank_id, review_text, rating, review_date, sentiment_label, sentiment_score, source)
-    VALUES (%s, %s, %s, %s, %s, %s, %s)
+INSERT INTO reviews 
+(bank_id, review_text, rating, review_date, sentiment_label, sentiment_score, source)
+VALUES (%s, %s, %s, %s, %s, %s, %s)
 """
 
 # Map bank name to bank_id
@@ -38,13 +35,13 @@ bank_map = {
 
 for _, row in df.iterrows():
     cursor.execute(insert_query, (
-        bank_map.get(row['bank'], None),   # safer
+        bank_map.get(row['bank'], None),
         row['review'],
-        row.get('rating', None),
-        row.get('date', None),
-        row['sentiment_label'],
-        row['sentiment_score'],
-        "Google Play"
+        row['rating'],
+        row['date'],
+        None,
+        None,
+        row['source']
     ))
 
 conn.commit()
