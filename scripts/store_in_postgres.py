@@ -1,44 +1,48 @@
-# scripts/store_in_postgres.py
-
-import pandas as pd
 import psycopg2
+import pandas as pd
 
-# Load analyzed CSV
-df = pd.read_csv("data/processed/bank_reviews_analysis.csv")
+# Load your cleaned CSV
+df = pd.read_csv("cleaned_reviews.csv")  # Output from Task 1 & 2
 
 # Connect to PostgreSQL
 conn = psycopg2.connect(
     host="localhost",
     database="bank_reviews",
-    user="postgres",
-    password="YOUR_PASSWORD"  # replace with your PostgreSQL password
+    user="postgres",  # or your user
+    password="your_password"
 )
 cur = conn.cursor()
 
-# Insert unique banks
-banks = df['bank'].unique()
-bank_id_map = {}
+# Insert banks into banks table (avoiding duplicates)
+banks = df['bank_name'].unique()
 for bank in banks:
-    cur.execute("INSERT INTO banks (bank_name) VALUES (%s) RETURNING bank_id", (bank,))
-    bank_id_map[bank] = cur.fetchone()[0]
+    cur.execute("""
+        INSERT INTO banks (name)
+        VALUES (%s)
+        ON CONFLICT (name) DO NOTHING;
+    """, (bank,))
 
 # Insert reviews
-for _, row in df.iterrows():
+for idx, row in df.iterrows():
+    # Get bank_id
+    cur.execute("SELECT bank_id FROM banks WHERE name=%s", (row['bank_name'],))
+    bank_id = cur.fetchone()[0]
+    
     cur.execute("""
-        INSERT INTO reviews (bank_id, review_text, rating, review_date, sentiment_label, sentiment_score, source)
-        VALUES (%s,%s,%s,%s,%s,%s,%s)
+        INSERT INTO reviews (bank_id, review_text, review_date, rating, sentiment_score, theme)
+        VALUES (%s, %s, %s, %s, %s, %s)
     """, (
-        bank_id_map[row['bank']],
-        row['review'],
+        bank_id,
+        row['review_text'],
+        row['review_date'],
         row['rating'],
-        row['date'],
-        row['sentiment_label'],
         row['sentiment_score'],
-        row['source']
+        row['theme']
     ))
 
+# Commit and close connection
 conn.commit()
 cur.close()
 conn.close()
 
-print("Data inserted into PostgreSQL successfully!")
+print("Data inserted successfully!")
